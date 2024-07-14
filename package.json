@@ -1,0 +1,14 @@
+{
+  "name": "schema",
+  "dependencies": {
+    "@loancrate/prisma-schema-parser": "^2.0.0",
+    "@types/node": "^20.14.10",
+    "pluralize": "^8.0.0",
+    "sqlite3": "^5.1.7",
+    "winston": "^3.13.1"
+  },
+  "packageManager": "bun@1.1.7",
+  "devDependencies": {
+    "@types/pluralize": "^0.0.33"
+  }
+}

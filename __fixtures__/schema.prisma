@@ -1,0 +1,14 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["reactNative"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./app.db"
+}
+
+model Report {
+  id    Int    @id @default(autoincrement())
+  notes String
+}
