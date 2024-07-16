@@ -1,22 +1,75 @@
-import { readFileSync } from "fs";
-import { resolve, join } from "path";
+import { readFileSync } from 'node:fs'
 import {
+  type BlockAttribute,
+  type Config,
+  type ConfigBlock,
+  type FieldDeclaration,
   type ModelDeclaration,
+  type PrismaSchema,
+  type ScalarLiteral,
   parsePrismaSchema,
-} from "@loancrate/prisma-schema-parser";
-import { plural } from "pluralize";
+} from '@loancrate/prisma-schema-parser'
+import path from 'node:path'
 
-const currentDir = resolve(__dirname);
-const fixture = join(currentDir, "..", "__fixtures__", "schema.prisma");
+export class Parser {
+  #ast: PrismaSchema
+  #schemaPath: string
 
-const ast = parsePrismaSchema(readFileSync(fixture, { encoding: "utf8" }));
+  constructor(schemaPath: string) {
+    this.#schemaPath = schemaPath
+    this.#ast = parsePrismaSchema(readFileSync(schemaPath, { encoding: 'utf8' }))
+  }
 
-export function getModels(): ModelDeclaration[] {
-  return ast.declarations.filter(
-    ({ kind }) => kind === "model"
-  ) as ModelDeclaration[];
-}
+  /**
+   * Get the datasource URL from the schema
+   * @returns string
+   */
+  getDatasource(): string {
+    const ds = this.#ast.declarations.find(({ kind }) => kind === 'datasource') as ConfigBlock
+    const config = ds.members.find((config: Config) => config.name.value === 'url') as Config
 
-export function getModelNames(): string[] {
-  return getModels().map((model) => plural(model.name.value.toLowerCase()));
+    const value = (config.value as ScalarLiteral).value as string
+    const databasePath = value.match(/file:(.*)/)?.[1] || value
+    return path.resolve(path.dirname(this.#schemaPath), databasePath)
+  }
+
+  /**
+   * Get all models in the schema
+   * @returns ModelDeclaration[]
+   */
+  getModels(): ModelDeclaration[] {
+    return this.#ast.declarations.filter(({ kind }) => kind === 'model') as ModelDeclaration[]
+  }
+
+  /**
+   * Get the names of all models in the schema
+   * @returns string[]
+   */
+  getModelNames(): string[] {
+    return this.getModels().map((model) => model.name.value)
+  }
+
+  /**
+   * Get the schema for a specific model
+   * @param modelName Name of the model
+   * @returns ModelDeclaration
+   */
+  getModelSchema(modelName: string): ModelDeclaration {
+    return this.getModels().find((model) => model.name.value === modelName)
+  }
+
+  /**
+   * Get the fields for a specific model
+   * @param modelName Name of the model
+   * @returns FieldDeclaration[]
+   */
+  getModelFields(modelName: string): FieldDeclaration[] {
+    const model = this.getModelSchema(modelName)
+    return (model?.members.filter((member) => member.kind === 'field') as FieldDeclaration[]) || []
+  }
+
+  getModelBlockAttributes(modelName: string): BlockAttribute[] {
+    const model = this.getModelSchema(modelName)
+    return (model?.members.filter((member) => member.kind === 'blockAttribute') as BlockAttribute[]) || []
+  }
 }

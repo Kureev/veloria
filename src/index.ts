@@ -1,42 +1,19 @@
-import { close } from "./db";
-import { logger } from "./logger";
-import { createMigrationTable } from "./migrations/createMigrationTable";
-import { fetchTableNames } from "./migrations/fetchTableNames";
-import { hasMigrationTable } from "./migrations/hasMigrationTable";
-import { getModelNames, getModels } from "./parser";
-import { plural } from "pluralize";
+import path from 'node:path'
+import { Database } from './db'
+import { Parser } from './parser'
+import { Migrator } from './migrations/Migrator'
 
-/**
- * Sets up the database by creating the migration table if it does not exist
- */
-async function setup() {
-  let migrationTable: boolean;
+async function main(schemaPath: string) {
+  const parser = new Parser(schemaPath)
+  const datasource = parser.getDatasource()
+  const db = new Database(datasource)
 
-  try {
-    migrationTable = await hasMigrationTable();
-  } catch (err) {
-    logger.error(`Failed to check if migration table exists ${err.message}`);
-  }
+  const migrator = new Migrator(db, parser)
+  await migrator.migrate()
 
-  if (migrationTable === false) {
-    logger.info("Creating migration table...");
-    try {
-      await createMigrationTable();
-    } catch (err) {
-      logger.error(`Failed to set up migration table ${err.message}`);
-    }
-    logger.info("Migration table created");
-  } else {
-    logger.info("Migration table already exists");
-  }
+  await db.close()
 }
 
-async function main() {
-  await setup();
-  const currentTableNames = await fetchTableNames();
-  const schemaTableNames = getModelNames();
-  console.log(currentTableNames, schemaTableNames);
-  await close();
-}
+const schemaPath = path.resolve(path.resolve(__dirname, '..', '__fixtures__', 'schema.prisma'))
 
-main();
+main(schemaPath)

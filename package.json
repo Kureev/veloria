@@ -9,6 +9,7 @@
   },
   "packageManager": "bun@1.1.7",
   "devDependencies": {
-    "@types/pluralize": "^0.0.33"
+    "@types/pluralize": "^0.0.33",
+    "prettier-plugin-prisma": "^5.0.0"
   }
 }
