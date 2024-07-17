@@ -3,6 +3,7 @@
   "dependencies": {
     "@loancrate/prisma-schema-parser": "^2.0.0",
     "@types/node": "^20.14.10",
+    "node-sql-parser": "^5.2.0",
     "pluralize": "^8.0.0",
     "sqlite3": "^5.1.7",
     "winston": "^3.13.1"

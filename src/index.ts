@@ -1,22 +1,27 @@
 import path from 'node:path'
-import { Database } from './db'
 import { Parser } from './parser'
 import { Migrator } from './migrations/Migrator'
-import { Converter } from './migrations/prisma/Converter'
+import { Converter as PrismaConverter } from './migrations/prisma/Converter'
+import { Converter as SQLiteConverter } from './migrations/sqlite/Converter'
+import { Database } from 'sqlite3'
 
 async function main(schemaPath: string) {
   const parser = new Parser(schemaPath)
-  // const datasource = parser.getDatasource()
-  // const db = new Database(datasource)
+  const datasource = parser.getDatasource()
 
-  const converter = new Converter(parser.getSchema())
-  const schema = converter.toSchema()
+  const prismaConverter = new PrismaConverter(parser.getSchema())
+  const schema = prismaConverter.toSchema()
+  const db = new Database(datasource)
 
-  // console.log(parser.getModelSchema('User').members.filter((member) => member.kind === 'blockAttribute'))
-  console.log(schema.tables.User)
+  // console.log(schema.tables.User)
 
-  // const migrator = new Migrator(db, parser)
-  // await migrator.migrate()
+  const sqliteConverter = new SQLiteConverter(db)
+  const sqliteSchema = await sqliteConverter.toSchema()
+
+  // console.log(sqliteSchema.tables.User)
+
+  const migrator = new Migrator(db)
+  await migrator.migrate(schema)
 
   // await db.close()
 }

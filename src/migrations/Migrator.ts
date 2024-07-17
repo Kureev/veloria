@@ -1,35 +1,32 @@
-import { plural, singular } from 'pluralize'
-import { Database } from '../db'
+import { Database } from 'sqlite3'
 import { logger } from '../logger'
-import { Parser } from '../parser'
+import { DatabaseSchema, TableDefinition } from './types'
 
-type Table = {
-  name: string
-}
+const MIGRATIONS_TABLE = 'migrations'
 
 export class Migrator {
   #db: Database
-  #parser: Parser
 
-  constructor(db: Database, parser: Parser) {
+  constructor(db: Database) {
     this.#db = db
-    this.#parser = parser
   }
 
   /**
    * Migrate the database to match the schema
    * @returns Promise<void>
    */
-  async migrate(): Promise<void> {
+  async migrate(schema: DatabaseSchema): Promise<void> {
     await this.#setupMigrationTable()
 
-    const schemaModelNames = this.#parser.getModelNames()
-    const existingTableNames = await this.#fetchTableNames()
+    const queue = Object.entries(schema.tables).filter(([, table]) => !table.ignore)
 
-    const newModels = schemaModelNames.filter((model) => !existingTableNames.includes(this.#convertToTableName(model)))
-    const deletedModels = existingTableNames.filter(
-      (table) => !schemaModelNames.includes(this.#convertToModelName(table))
-    )
+    const tables = queue.map(async ([name, table]) => this.#createTable(name, table))
+    await Promise.all(tables)
+
+    const indexes = queue.map(async ([name, table]) => this.#createIndexes(name, table))
+    await Promise.all(indexes)
+
+    logger.info('Migration complete')
   }
 
   /**
@@ -58,33 +55,12 @@ export class Migrator {
   }
 
   /**
-   * Table names are plural and lowercase. Model names are singular and capitalized.
-   * Function converts model names to table names.
-   * @param model Model name
-   * @returns Table name
-   */
-  #convertToTableName(model: string): string {
-    return plural(model).toLowerCase()
-  }
-
-  /**
-   * Table names are plural and lowercase. Model names are singular and capitalized.
-   * Function converts table names to model names.
-   * @param table Table name
-   * @returns Model name
-   */
-  #convertToModelName(table: string): string {
-    const singularName = singular(table)
-    return singularName.charAt(0).toUpperCase() + singularName.slice(1)
-  }
-
-  /**
    * Returns a promise that resolves to a boolean indicating whether the migrations table exists
    * @returns Promise<boolean>
    */
   async #hasMigrationTable(): Promise<boolean> {
     return new Promise((resolve) => {
-      this.#db.instance.get("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'", (err, row) => {
+      this.#db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='${MIGRATIONS_TABLE}'`, (err, row) => {
         if (err) {
           logger.error(err)
           resolve(false)
@@ -101,14 +77,11 @@ export class Migrator {
    */
   async #createMigrationTable(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.#db.instance.run(
-        `
-      CREATE TABLE IF NOT EXISTS migrations (
-        id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `,
+      this.#db.run(
+        [
+          `CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE}`,
+          `(id INTEGER PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+        ].join(' '),
         (err) => {
           if (err) {
             logger.error(err)
@@ -120,22 +93,51 @@ export class Migrator {
     })
   }
 
-  /**
-   * Fetch all tables in the database excluding system tables and the `migration` table
-   * @returns Promise<string[]>
-   */
-  #fetchTableNames(): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-      this.#db.instance.all<Table>(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'migrations';",
-        (err, rows) => {
-          if (err) {
-            reject(err)
-          } else {
-            resolve(rows.map((row) => row.name))
-          }
+  async #createTable(name: string, schema: TableDefinition): Promise<void> {
+    const columns = Object.entries(schema.columns)
+      .map(([name, column]) => {
+        const parts = [name, column.type]
+        if (column.notNull) {
+          parts.push('NOT NULL')
         }
-      )
+        if (column.primaryKey) {
+          parts.push('PRIMARY KEY')
+        }
+        if (column.unique) {
+          parts.push('UNIQUE')
+        }
+        if (column.default) {
+          parts.push(column.default)
+        }
+        return parts.join(' ')
+      })
+      .join(', ')
+
+    return this.#run(`CREATE TABLE IF NOT EXISTS ${schema.map ?? name} (${columns})`)
+  }
+
+  async #createIndexes(name: string, schema: TableDefinition): Promise<void> {
+    const indexes = schema.indexes?.map((index) => {
+      const columns = index.columns.join(', ')
+      return `CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX IF NOT EXISTS ${index.name} ON ${name} (${columns})`
+    })
+
+    if (!indexes) {
+      return
+    }
+
+    await Promise.all(indexes.map((sql) => this.#run(sql)))
+  }
+
+  async #run(sql: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.#db.run(sql, (err) => {
+        if (err) {
+          logger.error(err)
+          reject()
+        }
+        resolve()
+      })
     })
   }
 }

@@ -5,8 +5,8 @@ export interface DatabaseSchema {
 export interface TableDefinition {
   columns: { [columnName: string]: ColumnDefinition }
   primaryKey: string[]
-  foreignKeys: { [columnName: string]: ForeignKeyDefinition }
-  indexes: IndexDefinition[]
+  foreignKeys?: { [columnName: string]: ForeignKeyDefinition }
+  indexes?: IndexDefinition[]
   ignore?: boolean
   map?: string
 }
@@ -32,4 +32,5 @@ export type ForeignKeyAction = 'NoAction' | 'Cascade' | 'SetNull' | 'SetDefault'
 export interface IndexDefinition {
   columns: string[]
   name?: string
+  unique?: boolean
 }
