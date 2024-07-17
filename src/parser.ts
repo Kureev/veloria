@@ -20,6 +20,10 @@ export class Parser {
     this.#ast = parsePrismaSchema(readFileSync(schemaPath, { encoding: 'utf8' }))
   }
 
+  getSchema(): PrismaSchema {
+    return this.#ast
+  }
+
   /**
    * Get the datasource URL from the schema
    * @returns string

@@ -3,29 +3,30 @@ datasource db {
   url      = "file:./db.sqlite3"
 }
 
-// model Report {
-//   id          String  @id @default(uuid())
-//   notes       String
-//   isPublished Boolean @default(true)
-// }
-
-// model User {
-//   firstName String
-//   lastName  String
-//   createdAt DateTime @default(now())
-
-//   @@id([firstName, lastName])
-// }
-
-model Test {
-  id       Int     @unique
-  name     String
-  result   String?
-  user     User?   @relation(fields: [userName], references: [name], onUpdate: NoAction, onDelete: Cascade)
-  userName String?
+model Report {
+  id          Int      @id @default(autoincrement())
+  notes       String   @default("No notes")
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  authorId    Int
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model User {
-  name String @id
-  Test Test[]
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  firstName String?
+  lastName  String?  @default("Doe") @map("last_name")
+  createdAt DateTime @default(now())
+  reports   Report[]
+
+  @@index([firstName, lastName], name: "first_name_index")
+}
+
+model Test {
+  id   Int    @id
+  name String
+
+  @@map(name: "tests")
+  @@ignore
 }
