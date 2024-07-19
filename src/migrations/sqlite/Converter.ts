@@ -1,6 +1,22 @@
 import { Database } from 'sqlite3'
 import { AST, Create, Parser } from 'node-sql-parser/build/sqlite'
-import { DatabaseSchema, TableDefinition } from '../types'
+import { DatabaseSchema, IndexDefinition, TableDefinition } from '../types'
+
+type TableIndexInfo = {
+  seqno: number
+  cid: number
+  name: string
+}
+
+type TableIndex = {
+  seq: number
+  name: string
+  unique: number
+  origin: string
+  partial: number
+}
+
+type TableIndexFormatted = Record<string, IndexDefinition[]>
 
 export class Converter {
   #db: Database
@@ -42,17 +58,19 @@ export class Converter {
     })
   }
 
-  async #getIndexes(tableNames: string[]) {
-    const queue: Promise<Record<string, unknown[]>>[] = tableNames.map(
+  async #getIndexes(tableNames: string[]): Promise<TableIndexFormatted> {
+    const queue: Promise<TableIndexFormatted>[] = tableNames.map(
       (tableName) =>
         new Promise((resolve, reject) => {
-          this.#db.all<{ name: string }>(`PRAGMA index_list(${tableName})`, (err, indexes) => {
+          this.#db.all<TableIndex>(`PRAGMA index_list(${tableName})`, async (err, indexes) => {
             if (err) {
               reject(err)
             } else {
               const indexInfoQueue = indexes.map((index) => this.#getIndexInfo(index))
-              Promise.all(indexInfoQueue).then((indexInfo) => {
-                resolve({ [tableName]: indexInfo })
+              const indexInfos = await Promise.all(indexInfoQueue)
+
+              resolve({
+                [tableName]: indexInfos.flat(),
               })
             }
           })
@@ -60,23 +78,20 @@ export class Converter {
     )
 
     const indexes = await Promise.all(queue)
-
-    return indexes.reduce((acc, index) => {
-      Object.entries(index).forEach(([tableName, indexes]) => {
-        acc[tableName] = indexes
-      })
-
-      return acc
-    }, {})
+    return indexes.reduce((acc, index) => ({ ...acc, ...index }), {})
   }
 
-  async #getIndexInfo(index: { name: string }): Promise<Record<string, any>> {
+  async #getIndexInfo({ name, unique }: TableIndex): Promise<IndexDefinition> {
     return new Promise((resolve, reject) => {
-      this.#db.all(`PRAGMA index_info(${index.name})`, (err, column) => {
+      this.#db.all<TableIndexInfo>(`PRAGMA index_info(${name})`, (err, info) => {
         if (err) {
           reject(err)
         } else {
-          resolve({ column, index })
+          resolve({
+            name,
+            columns: info.map(({ name }) => name),
+            unique: !!unique,
+          })
         }
       })
     })
@@ -84,7 +99,7 @@ export class Converter {
 
   #convertTableInfoToTableDefinition(
     definitions: Create['create_definitions'],
-    indexes: Record<string, unknown>[]
+    indexes: IndexDefinition[]
   ): TableDefinition | undefined {
     if (!definitions) {
       return { columns: {}, indexes: [], primaryKey: [], foreignKeys: {} }
@@ -107,13 +122,7 @@ export class Converter {
         {} as TableDefinition['columns']
       ),
       // TODO
-      indexes: indexes.map((index) => {
-        return {
-          columns: index.column.map((col: any) => col.name),
-          name: index.index.name,
-          unique: Boolean(index.index.unique),
-        }
-      }),
+      indexes,
       primaryKey: [],
       foreignKeys: {},
     }
