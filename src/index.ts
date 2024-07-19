@@ -13,12 +13,12 @@ async function main(schemaPath: string) {
   const schema = prismaConverter.toSchema()
   const db = new Database(datasource)
 
-  // console.log(schema.tables.User)
+  // console.log(schema.tables.Report)
 
   const sqliteConverter = new SQLiteConverter(db)
   const sqliteSchema = await sqliteConverter.toSchema()
 
-  // console.log(sqliteSchema.tables.User)
+  console.log(sqliteSchema.tables.Report)
 
   const migrator = new Migrator(db)
   await migrator.migrate(schema)

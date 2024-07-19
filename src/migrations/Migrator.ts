@@ -1,16 +1,10 @@
-import { Database } from 'sqlite3'
 import { logger } from '../logger'
-import { DatabaseSchema, TableDefinition } from './types'
+import { DatabaseSchema, ForeignKeyDefinition, TableDefinition } from './types'
+import { BaseSQLite } from './BaseSQLite'
 
 const MIGRATIONS_TABLE = 'migrations'
 
-export class Migrator {
-  #db: Database
-
-  constructor(db: Database) {
-    this.#db = db
-  }
-
+export class Migrator extends BaseSQLite {
   /**
    * Migrate the database to match the schema
    * @returns Promise<void>
@@ -59,16 +53,8 @@ export class Migrator {
    * @returns Promise<boolean>
    */
   async #hasMigrationTable(): Promise<boolean> {
-    return new Promise((resolve) => {
-      this.#db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='${MIGRATIONS_TABLE}'`, (err, row) => {
-        if (err) {
-          logger.error(err)
-          resolve(false)
-        } else {
-          resolve(row !== undefined)
-        }
-      })
-    })
+    const rows = this.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='${MIGRATIONS_TABLE}'`)
+    return rows != undefined
   }
 
   /**
@@ -76,44 +62,50 @@ export class Migrator {
    * @returns Promise<void>
    */
   async #createMigrationTable(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.#db.run(
+    try {
+      await this.run(
         [
           `CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE}`,
           `(id INTEGER PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-        ].join(' '),
-        (err) => {
-          if (err) {
-            logger.error(err)
-            reject()
-          }
-          resolve()
-        }
+        ].join(' ')
       )
-    })
+    } catch (err) {
+      logger.error(err)
+    }
   }
 
   async #createTable(name: string, schema: TableDefinition): Promise<void> {
-    const columns = Object.entries(schema.columns)
-      .map(([name, column]) => {
-        const parts = [name, column.type]
-        if (column.notNull) {
-          parts.push('NOT NULL')
-        }
-        if (column.primaryKey) {
-          parts.push('PRIMARY KEY')
-        }
-        if (column.unique) {
-          parts.push('UNIQUE')
-        }
-        if (column.default) {
-          parts.push(column.default)
-        }
-        return parts.join(' ')
-      })
-      .join(', ')
+    const columns = Object.entries(schema.columns).map(([name, column]) => {
+      const parts = [name, column.type]
+      if (column.notNull) {
+        parts.push('NOT NULL')
+      }
+      if (column.primaryKey) {
+        parts.push('PRIMARY KEY')
+      }
+      if (column.unique) {
+        parts.push('UNIQUE')
+      }
+      if (column.default) {
+        parts.push(column.default)
+      }
+      return parts.join(' ')
+    })
 
-    return this.#run(`CREATE TABLE IF NOT EXISTS ${schema.map ?? name} (${columns})`)
+    const foreignKeys =
+      schema.foreignKeys?.map((fk: ForeignKeyDefinition) => {
+        const references = fk.references.join(', ')
+        const referencedColumns = fk.referencedColumns.join(', ')
+        const onUpdate = fk.onUpdate ? `ON UPDATE ${fk.onUpdate}` : ''
+        const onDelete = fk.onDelete ? `ON DELETE ${fk.onDelete}` : ''
+        return `FOREIGN KEY (${references}) REFERENCES ${fk.referencedTable} (${referencedColumns}) ${onUpdate} ${onDelete}`
+      }) || []
+
+    const fields = [...columns, ...foreignKeys].join(', ')
+
+    await this.run(`PRAGMA foreign_keys=OFF`)
+    await this.run(`CREATE TABLE IF NOT EXISTS ${schema.map ?? name} (${fields})`)
+    await this.run(`PRAGMA foreign_keys=ON`)
   }
 
   async #createIndexes(name: string, schema: TableDefinition): Promise<void> {
@@ -126,18 +118,6 @@ export class Migrator {
       return
     }
 
-    await Promise.all(indexes.map((sql) => this.#run(sql)))
-  }
-
-  async #run(sql: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.#db.run(sql, (err) => {
-        if (err) {
-          logger.error(err)
-          reject()
-        }
-        resolve()
-      })
-    })
+    await Promise.all(indexes.map((sql) => this.run(sql)))
   }
 }

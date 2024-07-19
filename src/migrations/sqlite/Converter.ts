@@ -1,6 +1,6 @@
-import { Database } from 'sqlite3'
 import { AST, Create, Parser } from 'node-sql-parser/build/sqlite'
 import { DatabaseSchema, IndexDefinition, TableDefinition } from '../types'
+import { BaseSQLite } from '../BaseSQLite'
 
 type TableIndexInfo = {
   seqno: number
@@ -18,13 +18,8 @@ type TableIndex = {
 
 type TableIndexFormatted = Record<string, IndexDefinition[]>
 
-export class Converter {
-  #db: Database
+export class Converter extends BaseSQLite {
   #parser = new Parser()
-
-  constructor(db: Database) {
-    this.#db = db
-  }
 
   async toSchema(): Promise<DatabaseSchema> {
     const tableAsts = await this.#getTables()
@@ -34,6 +29,7 @@ export class Converter {
     const tableNames = creationAST.map((ast) => ast.table![0].table)
 
     const tableIndexes = await this.#getIndexes(tableNames)
+    const foreignKeys = await this.#getForeignKeys(tableNames)
 
     for (const { table, create_definitions } of creationAST) {
       const tableName = table![0].table
@@ -44,57 +40,55 @@ export class Converter {
   }
 
   async #getTables(): Promise<AST[]> {
-    return new Promise((resolve, reject) => {
-      this.#db.all<{ sql: string }>(
-        "SELECT sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'migrations';",
-        (err, rows) => {
-          if (err) {
-            reject(err)
-          } else {
-            resolve(rows.map((row) => this.#parser.astify(row.sql) as AST))
-          }
-        }
-      )
-    })
+    const rows = await this.all<{ sql: string }>(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'migrations';"
+    )
+    return rows.map((row) => this.#parser.astify(row.sql) as AST)
   }
 
   async #getIndexes(tableNames: string[]): Promise<TableIndexFormatted> {
-    const queue: Promise<TableIndexFormatted>[] = tableNames.map(
-      (tableName) =>
-        new Promise((resolve, reject) => {
-          this.#db.all<TableIndex>(`PRAGMA index_list(${tableName})`, async (err, indexes) => {
-            if (err) {
-              reject(err)
-            } else {
-              const indexInfoQueue = indexes.map((index) => this.#getIndexInfo(index))
-              const indexInfos = await Promise.all(indexInfoQueue)
+    const queue: Promise<TableIndexFormatted>[] = tableNames.map(async (tableName) => {
+      const indexes = await this.all<TableIndex>(`PRAGMA index_list(${tableName})`)
 
-              resolve({
-                [tableName]: indexInfos.flat(),
-              })
-            }
-          })
-        })
-    )
+      const indexInfoQueue = indexes.map((index) => this.#getIndexInfo(index))
+      const indexInfos = await Promise.all(indexInfoQueue)
+
+      return {
+        [tableName]: indexInfos.flat(),
+      }
+    })
 
     const indexes = await Promise.all(queue)
     return indexes.reduce((acc, index) => ({ ...acc, ...index }), {})
   }
 
+  async #getForeignKeys(tableNames: string[]): Promise<Record<string, Record<string, string>>> {
+    const queue: Promise<Record<string, Record<string, string>>>[] = tableNames.map((tableName) =>
+      this.#getForeignKey(tableName).then((foreignKeys) => ({ [tableName]: foreignKeys }))
+    )
+
+    const foreignKeys = await Promise.all(queue)
+    return foreignKeys.reduce((acc, foreignKey) => ({ ...acc, ...foreignKey }), {})
+  }
+
+  async #getForeignKey(tableName: string): Promise<Record<string, string>> {
+    const rows = await this.all<any>(`PRAGMA foreign_key_list(${tableName})`)
+    return rows.reduce(
+      (acc, row) => {
+        acc[row.from] = row.table
+        return acc
+      },
+      {} as Record<string, string>
+    )
+  }
+
   async #getIndexInfo({ name, unique }: TableIndex): Promise<IndexDefinition> {
-    return new Promise((resolve, reject) => {
-      this.#db.all<TableIndexInfo>(`PRAGMA index_info(${name})`, (err, info) => {
-        if (err) {
-          reject(err)
-        } else {
-          resolve({
-            name,
-            columns: info.map(({ name }) => name),
-            unique: !!unique,
-          })
-        }
-      })
-    })
+    const info = await this.all<TableIndexInfo>(`PRAGMA index_info(${name})`)
+    return {
+      name,
+      columns: info.map(({ name }) => name),
+      unique: !!unique,
+    }
   }
 
   #convertTableInfoToTableDefinition(
@@ -102,7 +96,7 @@ export class Converter {
     indexes: IndexDefinition[]
   ): TableDefinition | undefined {
     if (!definitions) {
-      return { columns: {}, indexes: [], primaryKey: [], foreignKeys: {} }
+      return { columns: {}, indexes: [], primaryKey: [], foreignKeys: [] }
     }
 
     const columns = definitions.filter((def) => def.resource === 'column')
@@ -114,7 +108,7 @@ export class Converter {
           const type = column.definition.dataType
           const notNull = column.nullable?.type === 'not null'
           const primaryKey = (column as any).primary_key === 'primary key'
-          const defaultValue = this.#formatDefaultValue(column.default_val)
+          const defaultValue = this.#formatDefaultValue(column.default_val, column.auto_increment)
 
           acc[name] = { type, notNull, primaryKey, default: defaultValue }
           return acc
@@ -124,11 +118,17 @@ export class Converter {
       // TODO
       indexes,
       primaryKey: [],
-      foreignKeys: {},
+      foreignKeys: [],
+      ignore: false,
+      map: undefined,
     }
   }
 
-  #formatDefaultValue(value: unknown): string | undefined {
+  #formatDefaultValue(value: unknown, autoIncrement: string | undefined): string | undefined {
+    if (autoIncrement) {
+      return 'AUTOINCREMENT'
+    }
+
     if (!value) {
       return undefined
     }

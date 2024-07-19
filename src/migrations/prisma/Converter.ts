@@ -21,6 +21,7 @@ import {
   type ColumnDefinition,
   type IndexDefinition,
   type TableDefinition,
+  ForeignKeyAction,
 } from '../types'
 
 export class Converter {
@@ -63,27 +64,24 @@ export class Converter {
    * @param fields Fields to search for foreign keys
    * @returns List of foreign keys
    */
-  #findForeignKeys(fields: FieldDeclaration[]): Record<string, ForeignKeyDefinition> {
-    return fields.reduce(
-      (acc, field: FieldDeclaration) => {
-        const relation = field.attributes?.find((attr) => attr.path.value[0] === 'relation')
-        if (!relation) return acc
+  #findForeignKeys(fields: FieldDeclaration[]): ForeignKeyDefinition[] {
+    return fields.reduce((acc: ForeignKeyDefinition[], field: FieldDeclaration) => {
+      const relation = field.attributes?.find((attr) => attr.path.value[0] === 'relation')
+      if (!relation) return acc
 
-        const namedArguments = relation.args!.filter((arg) => arg.kind === 'namedArgument')
-        const args = getArgumentValuesObject(namedArguments)
+      const namedArguments = relation.args!.filter((arg) => arg.kind === 'namedArgument')
+      const args = getArgumentValuesObject(namedArguments)
 
-        acc[field.name.value] = {
-          referencedTable: getTypeValue(field.type),
-          references: args.fields,
-          referencedColumn: args.references,
-          onUpdate: this.#mapReferencialAction(args.onUpdate as string),
-          onDelete: this.#mapReferencialAction(args.onDelete as string),
-        } as ForeignKeyDefinition
+      acc.push({
+        referencedTable: getTypeValue(field.type) as string,
+        references: args.fields as string[],
+        referencedColumns: args.references as string[],
+        onUpdate: this.#mapReferencialAction(args.onUpdate as string) as ForeignKeyAction,
+        onDelete: this.#mapReferencialAction(args.onDelete as string) as ForeignKeyAction,
+      })
 
-        return acc
-      },
-      {} as Record<string, ForeignKeyDefinition>
-    )
+      return acc
+    }, [] as ForeignKeyDefinition[])
   }
 
   /**
@@ -113,11 +111,13 @@ export class Converter {
    */
   #findIndexes(blocks: BlockAttribute[]): IndexDefinition[] {
     return blocks.reduce((acc, block: BlockAttribute) => {
-      if (getExpressionValue(block.path) === 'index') {
+      if (['index', 'unique'].find((value) => getExpressionValue(block.path) === value)) {
+        const type = getExpressionValue(block.path)
         const args = getArgumentValues(block.args!) as [string[], string]
         acc.push({
           columns: args[0],
           name: args[1],
+          unique: type === 'unique',
         })
       }
       return acc

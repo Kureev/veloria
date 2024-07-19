@@ -10,6 +10,8 @@ model Report {
   createdAt   DateTime @default(now())
   authorId    Int
   author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([notes, isPublished], name: "published_notes_unique")
 }
 
 model User {
@@ -20,7 +22,7 @@ model User {
   createdAt DateTime @default(now())
   reports   Report[]
 
-  @@index([firstName, lastName], name: "first_name_index")
+  @@unique([email, id], name: "full_name_unique")
 }
 
 model Test {

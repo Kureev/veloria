@@ -5,7 +5,7 @@ export interface DatabaseSchema {
 export interface TableDefinition {
   columns: { [columnName: string]: ColumnDefinition }
   primaryKey: string[]
-  foreignKeys?: { [columnName: string]: ForeignKeyDefinition }
+  foreignKeys?: ForeignKeyDefinition[]
   indexes?: IndexDefinition[]
   ignore?: boolean
   map?: string
@@ -21,10 +21,11 @@ export interface ColumnDefinition {
 }
 
 export interface ForeignKeyDefinition {
-  references: string
-  referencedColumn: string
-  onUpdate: ForeignKeyAction
-  onDelete: ForeignKeyAction
+  referencedTable: string
+  references: string[]
+  referencedColumns: string[]
+  onUpdate?: ForeignKeyAction
+  onDelete?: ForeignKeyAction
 }
 
 export type ForeignKeyAction = 'NoAction' | 'Cascade' | 'SetNull' | 'SetDefault' | 'Restrict'
