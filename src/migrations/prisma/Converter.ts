@@ -163,7 +163,7 @@ export class Converter {
     const blockAttributes = model.members.filter(({ kind }) => kind === 'blockAttribute') as BlockAttribute[]
     return {
       columns: this.#formatColumns(fields),
-      primaryKey: this.#findPrimaryKeys(fields),
+      primaryKeys: this.#findPrimaryKeys(fields),
       foreignKeys: this.#findForeignKeys(fields),
       indexes: this.#findIndexes(blockAttributes),
       ignore: this.#isIgnored(model),

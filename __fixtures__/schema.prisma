@@ -7,22 +7,22 @@ model Report {
   id          Int      @id @default(autoincrement())
   notes       String   @default("No notes")
   isPublished Boolean  @default(true)
+  companyId   Int?
   createdAt   DateTime @default(now())
-  authorId    Int
-  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-  @@unique([notes, isPublished], name: "published_notes_unique")
+  authorId    Int?
+  author      User?    @relation(fields: [authorId, companyId], references: [id, companyId], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model User {
   id        Int      @id @default(autoincrement())
+  companyId Int?
   email     String   @unique
   firstName String?
   lastName  String?  @default("Doe") @map("last_name")
   createdAt DateTime @default(now())
   reports   Report[]
 
-  @@unique([email, id], name: "full_name_unique")
+  @@unique([id, companyId], name: "published_notes_unique")
 }
 
 model Test {

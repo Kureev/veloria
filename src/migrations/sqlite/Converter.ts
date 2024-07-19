@@ -1,5 +1,5 @@
 import { AST, Create, Parser } from 'node-sql-parser/build/sqlite'
-import { DatabaseSchema, IndexDefinition, TableDefinition } from '../types'
+import { DatabaseSchema, ForeignKeyAction, ForeignKeyDefinition, IndexDefinition, TableDefinition } from '../types'
 import { BaseSQLite } from '../BaseSQLite'
 
 type TableIndexInfo = {
@@ -14,6 +14,17 @@ type TableIndex = {
   unique: number
   origin: string
   partial: number
+}
+
+type TableForeignKey = {
+  id: number
+  seq: number
+  table: string
+  from: string
+  to: string
+  on_update: string
+  on_delete: string
+  match: string
 }
 
 type TableIndexFormatted = Record<string, IndexDefinition[]>
@@ -33,7 +44,11 @@ export class Converter extends BaseSQLite {
 
     for (const { table, create_definitions } of creationAST) {
       const tableName = table![0].table
-      schema.tables[tableName] = this.#convertTableInfoToTableDefinition(create_definitions, tableIndexes[tableName])!
+      schema.tables[tableName] = this.#convertTableInfoToTableDefinition(
+        create_definitions,
+        tableIndexes[tableName],
+        foreignKeys[tableName]
+      )!
     }
 
     return schema
@@ -43,7 +58,10 @@ export class Converter extends BaseSQLite {
     const rows = await this.all<{ sql: string }>(
       "SELECT sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'migrations';"
     )
-    return rows.map((row) => this.#parser.astify(row.sql) as AST)
+    return rows.map((row) => {
+      const ast = this.#parser.astify(row.sql) as AST
+      return ast
+    })
   }
 
   async #getIndexes(tableNames: string[]): Promise<TableIndexFormatted> {
@@ -62,24 +80,61 @@ export class Converter extends BaseSQLite {
     return indexes.reduce((acc, index) => ({ ...acc, ...index }), {})
   }
 
-  async #getForeignKeys(tableNames: string[]): Promise<Record<string, Record<string, string>>> {
-    const queue: Promise<Record<string, Record<string, string>>>[] = tableNames.map((tableName) =>
-      this.#getForeignKey(tableName).then((foreignKeys) => ({ [tableName]: foreignKeys }))
-    )
+  async #getForeignKeys(tableNames: string[]): Promise<Record<string, ForeignKeyDefinition[]>> {
+    const queue: Promise<Record<string, ForeignKeyDefinition>[] | null>[] = tableNames.map(async (tableName) => {
+      const fk = await this.#getForeignKey(tableName)
+      if (!fk.length) {
+        return null
+      }
+
+      return fk.map((key) => ({
+        [tableName]: {
+          id: key.id,
+          referencedTable: key.table,
+          references: [key.from],
+          referencedColumns: [key.to],
+          onUpdate: key.on_update as ForeignKeyAction,
+          onDelete: key.on_delete as ForeignKeyAction,
+        },
+      }))
+    })
 
     const foreignKeys = await Promise.all(queue)
-    return foreignKeys.reduce((acc, foreignKey) => ({ ...acc, ...foreignKey }), {})
+    const mergedForeignKeys: Record<string, ForeignKeyDefinition[]> = {}
+
+    /**
+     * PRAGMA foreign_key_list return multiple rows for a single foreign key if it references multiple columns.
+     * Hence, we need to merge the foreign keys with identical id into one object.
+     */
+    for (const fk of foreignKeys) {
+      if (!fk) {
+        continue
+      }
+
+      for (const key of fk) {
+        const tableName = Object.keys(key)[0]
+        const foreignKey = Object.values(key)[0]
+
+        if (!mergedForeignKeys[tableName]) {
+          mergedForeignKeys[tableName] = [foreignKey]
+          continue
+        }
+
+        const existingForeignKey = mergedForeignKeys[tableName].find((fk) => fk.id === foreignKey.id)
+        if (existingForeignKey) {
+          existingForeignKey.references.push(...foreignKey.references)
+          existingForeignKey.referencedColumns.push(...foreignKey.referencedColumns)
+        } else {
+          mergedForeignKeys[tableName].push(foreignKey)
+        }
+      }
+    }
+
+    return mergedForeignKeys
   }
 
-  async #getForeignKey(tableName: string): Promise<Record<string, string>> {
-    const rows = await this.all<any>(`PRAGMA foreign_key_list(${tableName})`)
-    return rows.reduce(
-      (acc, row) => {
-        acc[row.from] = row.table
-        return acc
-      },
-      {} as Record<string, string>
-    )
+  async #getForeignKey(tableName: string): Promise<TableForeignKey[]> {
+    return this.all<TableForeignKey>(`PRAGMA foreign_key_list(${tableName})`)
   }
 
   async #getIndexInfo({ name, unique }: TableIndex): Promise<IndexDefinition> {
@@ -93,13 +148,15 @@ export class Converter extends BaseSQLite {
 
   #convertTableInfoToTableDefinition(
     definitions: Create['create_definitions'],
-    indexes: IndexDefinition[]
+    indexes: IndexDefinition[],
+    foreignKeys: ForeignKeyDefinition[]
   ): TableDefinition | undefined {
     if (!definitions) {
-      return { columns: {}, indexes: [], primaryKey: [], foreignKeys: [] }
+      return { columns: {}, indexes: [], primaryKeys: [], foreignKeys: [] }
     }
 
     const columns = definitions.filter((def) => def.resource === 'column')
+    let primaryKeys: string[] = []
 
     return {
       columns: columns.reduce(
@@ -110,15 +167,18 @@ export class Converter extends BaseSQLite {
           const primaryKey = (column as any).primary_key === 'primary key'
           const defaultValue = this.#formatDefaultValue(column.default_val, column.auto_increment)
 
+          if (primaryKey) {
+            primaryKeys.push(name)
+          }
+
           acc[name] = { type, notNull, primaryKey, default: defaultValue }
           return acc
         },
         {} as TableDefinition['columns']
       ),
-      // TODO
       indexes,
-      primaryKey: [],
-      foreignKeys: [],
+      primaryKeys,
+      foreignKeys,
       ignore: false,
       map: undefined,
     }

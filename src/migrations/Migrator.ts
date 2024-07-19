@@ -98,7 +98,7 @@ export class Migrator extends BaseSQLite {
         const referencedColumns = fk.referencedColumns.join(', ')
         const onUpdate = fk.onUpdate ? `ON UPDATE ${fk.onUpdate}` : ''
         const onDelete = fk.onDelete ? `ON DELETE ${fk.onDelete}` : ''
-        return `FOREIGN KEY (${references}) REFERENCES ${fk.referencedTable} (${referencedColumns}) ${onUpdate} ${onDelete}`
+        return `FOREIGN KEY (${references}) REFERENCES \`${fk.referencedTable}\`(${referencedColumns}) ${onUpdate} ${onDelete}`
       }) || []
 
     const fields = [...columns, ...foreignKeys].join(', ')

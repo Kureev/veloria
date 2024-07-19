@@ -4,7 +4,7 @@ export interface DatabaseSchema {
 
 export interface TableDefinition {
   columns: { [columnName: string]: ColumnDefinition }
-  primaryKey: string[]
+  primaryKeys: string[]
   foreignKeys?: ForeignKeyDefinition[]
   indexes?: IndexDefinition[]
   ignore?: boolean
@@ -21,6 +21,7 @@ export interface ColumnDefinition {
 }
 
 export interface ForeignKeyDefinition {
+  id?: number
   referencedTable: string
   references: string[]
   referencedColumns: string[]
