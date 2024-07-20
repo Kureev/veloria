@@ -163,15 +163,16 @@ export class Converter extends BaseSQLite {
         (acc, column) => {
           const name = column.column.column as string
           const type = column.definition.dataType
+          const unique = !!column.unique
           const notNull = column.nullable?.type === 'not null'
-          const primaryKey = (column as any).primary_key === 'primary key'
+          const primaryKey = !!(column as any).primary_key
           const defaultValue = this.#formatDefaultValue(column.default_val, column.auto_increment)
 
           if (primaryKey) {
             primaryKeys.push(name)
           }
 
-          acc[name] = { type, notNull, primaryKey, default: defaultValue }
+          acc[name] = { type, notNull, unique, primaryKey, default: defaultValue }
           return acc
         },
         {} as TableDefinition['columns']
