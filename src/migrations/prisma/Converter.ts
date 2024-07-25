@@ -23,6 +23,7 @@ import {
   type TableDefinition,
   ForeignKeyAction,
 } from '../types'
+import { Column } from '../common/Column'
 
 export class Converter {
   #schema: PrismaSchema
@@ -76,8 +77,8 @@ export class Converter {
         referencedTable: getTypeValue(field.type) as string,
         references: args.fields as string[],
         referencedColumns: args.references as string[],
-        onUpdate: this.#mapReferencialAction(args.onUpdate as string) as ForeignKeyAction,
-        onDelete: this.#mapReferencialAction(args.onDelete as string) as ForeignKeyAction,
+        onUpdate: args.onUpdate as ForeignKeyAction,
+        onDelete: args.onDelete as ForeignKeyAction,
       })
 
       return acc
@@ -89,7 +90,7 @@ export class Converter {
    * @param fields Fields to format
    * @returns Map of column names to column definitions
    */
-  #formatColumns(fields: FieldDeclaration[]): Record<string, ColumnDefinition> {
+  #formatColumns(fields: FieldDeclaration[]): Record<string, Column> {
     return fields.reduce(
       (acc, field: FieldDeclaration) => {
         const column = this.#convertPrismaFieldToSchemaColumn(field)
@@ -100,7 +101,7 @@ export class Converter {
 
         return acc
       },
-      {} as Record<string, ColumnDefinition>
+      {} as Record<string, Column>
     )
   }
 
@@ -132,7 +133,7 @@ export class Converter {
   #isIgnored(model: ModelDeclaration): boolean {
     const blockAttributes = model.members.filter(({ kind }) => kind === 'blockAttribute') as BlockAttribute[]
     return blockAttributes.some((block) => {
-      return (getExpressionValue(block.path) as [string])[0] === 'ignore'
+      return block.path.value[0] === 'ignore'
     })
   }
 
@@ -172,26 +173,6 @@ export class Converter {
   }
 
   /**
-   * Map referencial action to SQLite referencial action
-   * @param action Prisma referencial action
-   * @returns SQLite referencial action
-   */
-  #mapReferencialAction(action: string): string | undefined {
-    switch (action) {
-      case 'NoAction':
-        return 'NO ACTION'
-      case 'Cascade':
-        return 'CASCADE'
-      case 'SetNull':
-        return 'SET NULL'
-      case 'SetDefault':
-        return 'SET DEFAULT'
-      case 'Restrict':
-        return 'RESTRICT'
-    }
-  }
-
-  /**
    * Check if the name is a table name
    * @param name Potential table name
    * @returns `true` if the name is a table name, `false` otherwise
@@ -206,21 +187,27 @@ export class Converter {
    * @param field Prisma field
    * @returns Schema column or `undefined` if the field is a table name
    */
-  #convertPrismaFieldToSchemaColumn(field: FieldDeclaration): ColumnDefinition | undefined {
+  #convertPrismaFieldToSchemaColumn(field: FieldDeclaration): Column | undefined {
     const type = getTypeValue(field.type)
 
     if (this.#isTableName(type)) {
       return undefined
     }
 
-    const column: ColumnDefinition = {
+    let defaultValue: string | undefined
+    const attrValue = findDefaultFieldAttribute(field)
+    if (attrValue) {
+      defaultValue = getExpressionValue(attrValue.expression) as string | undefined
+    }
+
+    const column = new Column(field.name.value, {
       type,
       notNull: field.type.kind !== 'optional',
       primaryKey: field.attributes?.some((attr) => attr.path.value[0] === 'id'),
       unique: field.attributes?.some((attr) => attr.path.value[0] === 'unique'),
-      default: getDefaultAttributeValue(findDefaultFieldAttribute(field)),
+      default: defaultValue,
       map: findMapFieldAttribute(field)?.name,
-    }
+    })
 
     return column
   }

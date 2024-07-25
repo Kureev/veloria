@@ -2,8 +2,15 @@ export interface DatabaseSchema {
   tables: { [tableName: string]: TableDefinition }
 }
 
+export interface Field<T> {
+  toSQL(): string
+  toInterface(): string
+  isOmittable(): boolean
+  get(name: string): T[keyof T]
+}
+
 export interface TableDefinition {
-  columns: { [columnName: string]: ColumnDefinition }
+  columns: { [columnName: string]: Field<ColumnDefinition> }
   primaryKeys: string[]
   foreignKeys?: ForeignKeyDefinition[]
   indexes?: IndexDefinition[]

@@ -1,6 +1,7 @@
 import { AST, Create, Parser } from 'node-sql-parser/build/sqlite'
 import { DatabaseSchema, ForeignKeyAction, ForeignKeyDefinition, IndexDefinition, TableDefinition } from '../types'
 import { BaseSQLite } from '../BaseSQLite'
+import { Column } from '../common/Column'
 
 type TableIndexInfo = {
   seqno: number
@@ -172,7 +173,7 @@ export class Converter extends BaseSQLite {
             primaryKeys.push(name)
           }
 
-          acc[name] = { type, notNull, unique, primaryKey, default: defaultValue }
+          acc[name] = new Column(name, { type, notNull, unique, primaryKey, default: defaultValue })
           return acc
         },
         {} as TableDefinition['columns']

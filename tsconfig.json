@@ -2,6 +2,7 @@
   "compilerOptions": {
     "module": "commonjs",
     "esModuleInterop": true,
+    "jsx": "preserve",
     "target": "es6",
     "moduleResolution": "node",
     "strict": true,

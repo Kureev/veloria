@@ -75,36 +75,23 @@ export class Migrator extends BaseSQLite {
   }
 
   async #createTable(name: string, schema: TableDefinition): Promise<void> {
-    const columns = Object.entries(schema.columns).map(([name, column]) => {
-      const parts = [name, column.type]
-      if (column.notNull) {
-        parts.push('NOT NULL')
-      }
-      if (column.primaryKey) {
-        parts.push('PRIMARY KEY')
-      }
-      if (column.unique) {
-        parts.push('UNIQUE')
-      }
-      if (column.default) {
-        parts.push(column.default)
-      }
-      return parts.join(' ')
-    })
+    const columns = Object.entries(schema.columns).map(([, column]) => column.toSQL())
 
     const foreignKeys =
       schema.foreignKeys?.map((fk: ForeignKeyDefinition) => {
         const references = fk.references.join(', ')
         const referencedColumns = fk.referencedColumns.join(', ')
-        const onUpdate = fk.onUpdate ? `ON UPDATE ${fk.onUpdate}` : ''
-        const onDelete = fk.onDelete ? `ON DELETE ${fk.onDelete}` : ''
+        const onUpdate = fk.onUpdate ? `ON UPDATE ${this.#mapReferencialAction(fk.onUpdate)}` : ''
+        const onDelete = fk.onDelete ? `ON DELETE ${this.#mapReferencialAction(fk.onDelete)}` : ''
         return `FOREIGN KEY (${references}) REFERENCES \`${fk.referencedTable}\`(${referencedColumns}) ${onUpdate} ${onDelete}`
       }) || []
 
     const fields = [...columns, ...foreignKeys].join(', ')
 
+    const query = `CREATE TABLE IF NOT EXISTS ${schema.map ?? name} (${fields})`
+
     await this.run(`PRAGMA foreign_keys=OFF`)
-    await this.run(`CREATE TABLE IF NOT EXISTS ${schema.map ?? name} (${fields})`)
+    await this.run(query)
     await this.run(`PRAGMA foreign_keys=ON`)
   }
 
@@ -119,5 +106,25 @@ export class Migrator extends BaseSQLite {
     }
 
     await Promise.all(indexes.map((sql) => this.run(sql)))
+  }
+
+  /**
+   * Map referencial action to SQLite referencial action
+   * @param action Prisma referencial action
+   * @returns SQLite referencial action
+   */
+  #mapReferencialAction(action: string): string | undefined {
+    switch (action) {
+      case 'NoAction':
+        return 'NO ACTION'
+      case 'Cascade':
+        return 'CASCADE'
+      case 'SetNull':
+        return 'SET NULL'
+      case 'SetDefault':
+        return 'SET DEFAULT'
+      case 'Restrict':
+        return 'RESTRICT'
+    }
   }
 }
