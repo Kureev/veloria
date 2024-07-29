@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync } from 'fs'
 import {
   type BlockAttribute,
   type Config,
@@ -9,7 +9,7 @@ import {
   type ScalarLiteral,
   parsePrismaSchema,
 } from '@loancrate/prisma-schema-parser'
-import path from 'node:path'
+import path from 'path'
 
 export class Parser {
   #ast: PrismaSchema
@@ -30,7 +30,9 @@ export class Parser {
    */
   getDatasource(): string {
     const ds = this.#ast.declarations.find(({ kind }) => kind === 'datasource') as ConfigBlock
-    const config = ds.members.find((config: Config) => config.name.value === 'url') as Config
+    const config = ds.members
+      .filter((member) => member.kind === 'config')
+      .find((config: Config) => config.name.value === 'url') as Config
 
     const value = (config.value as ScalarLiteral).value as string
     const databasePath = value.match(/file:(.*)/)?.[1] || value
@@ -59,7 +61,7 @@ export class Parser {
    * @returns ModelDeclaration
    */
   getModelSchema(modelName: string): ModelDeclaration {
-    return this.getModels().find((model) => model.name.value === modelName)
+    return this.getModels().find((model) => model.name.value === modelName) as ModelDeclaration
   }
 
   /**

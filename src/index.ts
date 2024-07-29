@@ -1,4 +1,4 @@
-import path from 'node:path'
+import path from 'path'
 import { Parser } from './parser'
 import { Migrator } from './migrations/Migrator'
 import { Converter as PrismaConverter } from './migrations/prisma/Converter'
@@ -8,7 +8,7 @@ import { TypeGenerator } from './types/TypeGenerator'
 import { HooksGenerator } from './hooks/HooksGenerator'
 import { EntryPointGenerator } from './entry/EntryPointGenerator'
 
-const outputFolder = path.resolve(__dirname, '..', 'node_modules', '@veloria/client')
+const outputFolder = path.resolve(process.cwd(), 'node_modules', '@veloria', 'client')
 
 async function main(schemaPath: string) {
   const parser = new Parser(schemaPath)
@@ -18,28 +18,28 @@ async function main(schemaPath: string) {
   const schema = prismaConverter.toSchema()
   const db = new Database(datasource)
 
-  console.log(schema.tables.User)
-
   const sqliteConverter = new SQLiteConverter(db)
   const sqliteSchema = await sqliteConverter.toSchema()
 
   const migrator = new Migrator(db)
-  await migrator.migrate(schema)
+  await migrator.migrate(sqliteSchema, schema)
 
   const typeGenerator = new TypeGenerator(schema)
   const types = typeGenerator.generate()
-  const typePath = path.resolve(outputFolder, 'schema.ts')
+  const typePath = path.resolve(outputFolder, 'types.ts')
   types.save(typePath)
 
   const hookGenerator = new HooksGenerator(schema)
-  const hooksPath = path.resolve(outputFolder, 'hooks.ts')
   const hooks = hookGenerator.generate()
 
-  hooks.save(hooksPath)
+  hooks.forEach((hook) => {
+    const output = path.resolve(outputFolder, 'hooks', `${hook.name}.ts`)
+    hook.save(output)
+  })
 
-  EntryPointGenerator.generate()
+  EntryPointGenerator.generate(datasource, hooks)
 }
 
-const schemaPath = path.resolve(path.resolve(__dirname, '..', '__fixtures__', 'schema.prisma'))
+const schemaPath = path.resolve(process.cwd(), '__fixtures__', 'schema.prisma')
 
 main(schemaPath)

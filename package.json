@@ -1,5 +1,9 @@
 {
-  "name": "schema",
+  "name": "@veloria/cli",
+  "main": "bin/index.js",
+  "bin": {
+    "veloria": "bin/index.js"
+  },
   "dependencies": {
     "@loancrate/prisma-schema-parser": "^2.0.0",
     "@types/node": "^20.14.10",
@@ -9,6 +13,9 @@
     "sqlite3": "^5.1.7",
     "winston": "^3.13.1"
   },
+  "scripts": {
+    "build": "node scripts/build.js"
+  },
   "packageManager": "bun@1.1.7",
   "peerDependencies": {
     "react": "^18.3.1",
@@ -17,6 +24,7 @@
   "devDependencies": {
     "@types/pluralize": "^0.0.33",
     "@types/react": "^18.3.3",
-    "prettier-plugin-prisma": "^5.0.0"
+    "prettier-plugin-prisma": "^5.0.0",
+    "typescript": "^5.5.4"
   }
 }

@@ -1,14 +1,16 @@
 {
+  "files": ["src/index.ts"],
   "compilerOptions": {
     "module": "commonjs",
     "esModuleInterop": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "target": "es6",
     "moduleResolution": "node",
     "strict": true,
     "strictNullChecks": true,
     "sourceMap": true,
-    "outDir": "dist"
+    "outDir": "bin",
+    "skipLibCheck": true
   },
   "lib": ["es2015"]
 }

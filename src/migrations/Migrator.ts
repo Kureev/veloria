@@ -9,10 +9,10 @@ export class Migrator extends BaseSQLite {
    * Migrate the database to match the schema
    * @returns Promise<void>
    */
-  async migrate(schema: DatabaseSchema): Promise<void> {
+  async migrate(current: DatabaseSchema, upstream: DatabaseSchema): Promise<void> {
     await this.#setupMigrationTable()
 
-    const queue = Object.entries(schema.tables).filter(([, table]) => !table.ignore)
+    const queue = Object.entries(upstream.tables).filter(([, table]) => !table.ignore)
 
     const tables = queue.map(async ([name, table]) => this.#createTable(name, table))
     await Promise.all(tables)
