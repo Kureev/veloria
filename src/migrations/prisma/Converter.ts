@@ -13,12 +13,10 @@ import {
   type PrismaSchema,
 } from '@loancrate/prisma-schema-parser'
 import { getTypeValue } from './getTypeValue'
-import { getDefaultAttributeValue } from './getDefaultAttributeValue'
 
 import {
   type DatabaseSchema,
   type ForeignKeyDefinition,
-  type ColumnDefinition,
   type IndexDefinition,
   type TableDefinition,
   ForeignKeyAction,
@@ -41,7 +39,10 @@ export class Converter {
     return {
       tables: models.reduce(
         (acc, model: ModelDeclaration) => {
-          acc[model.name.value] = this.#convertPrismaModelToSchemaTable(model)
+          const schema = this.#convertPrismaModelToSchemaTable(model)
+          if (schema.ignore) return acc
+
+          acc[model.name.value] = schema
           return acc
         },
         {} as Record<string, TableDefinition>

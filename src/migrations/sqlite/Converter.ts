@@ -37,6 +37,10 @@ export class Converter extends BaseSQLite {
     const tableAsts = await this.#getTables()
     const schema: DatabaseSchema = { tables: {} }
 
+    if (!tableAsts.length) {
+      return schema
+    }
+
     const creationAST = tableAsts.filter((ast) => ast.type === 'create')
     const tableNames = creationAST.map((ast) => ast.table![0].table)
 
@@ -57,7 +61,7 @@ export class Converter extends BaseSQLite {
 
   async #getTables(): Promise<AST[]> {
     const rows = await this.all<{ sql: string }>(
-      "SELECT sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'migrations';"
+      `SELECT sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '${this.getMigrationsTableName()}';`
     )
     return rows.map((row) => {
       const ast = this.#parser.astify(row.sql) as AST
@@ -73,7 +77,7 @@ export class Converter extends BaseSQLite {
       const indexInfos = await Promise.all(indexInfoQueue)
 
       return {
-        [tableName]: indexInfos.flat(),
+        [tableName]: indexInfos.flat().filter((index) => !index.name.startsWith('sqlite_autoindex_')),
       }
     })
 
@@ -200,7 +204,12 @@ export class Converter extends BaseSQLite {
       case 'number':
         return `DEFAULT '${(value as any).value.value}'`
       case 'function':
-        return `DEFAULT (${(value as any).value.name.name[0].value}${this.#formatArgs((value as any).value.args)})`
+        const $value = (value as any).value.name.name[0].value
+        const $type = (value as any).value.name.name[0].type
+        if ($type === 'origin') {
+          return `DEFAULT ${(value as any).value.name.name[0].value}`
+        }
+        return `DEFAULT (${$value}${this.#formatArgs((value as any).value.args)})`
       default:
         console.log((value as any).value.value)
     }

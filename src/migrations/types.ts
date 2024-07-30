@@ -40,6 +40,6 @@ export type ForeignKeyAction = 'NoAction' | 'Cascade' | 'SetNull' | 'SetDefault'
 
 export interface IndexDefinition {
   columns: string[]
-  name?: string
+  name: string
   unique?: boolean
 }
