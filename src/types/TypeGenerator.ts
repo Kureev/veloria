@@ -1,4 +1,5 @@
-import { ColumnDefinition, DatabaseSchema, Field } from '../migrations/types'
+import { DatabaseSchema } from '../migrations/common/DatabaseSchema'
+import { ColumnDefinition, Field } from '../migrations/types'
 import { TypeObject } from './TypeObject'
 
 function capitalize(str: string) {
@@ -13,12 +14,7 @@ type WithOptional<T, K extends keyof T> = Partial<Pick<T, K>> & Omit<T, K>;
  * Class to generate typescript definitions and react hooks for the schema
  */
 export class TypeGenerator {
-  private schema: DatabaseSchema
-
-  constructor(schema: DatabaseSchema) {
-    const filtered = Object.entries(schema.tables).filter(([, table]) => !table.ignore)
-    this.schema = { tables: Object.fromEntries(filtered) }
-  }
+  constructor(private schema: DatabaseSchema) {}
 
   getCreateEntityName(name: string) {
     return `Create${this.getEntityName(name)}Input`
@@ -29,7 +25,7 @@ export class TypeGenerator {
   }
 
   generate() {
-    const tables = Object.entries(this.schema.tables)
+    const tables = Object.entries(this.schema.getTables())
       .map(([name, table]) => {
         const typeName = this.getEntityName(name)
         return `export interface ${typeName} {\n${this.#generateFields(table.columns)}\n}`
@@ -48,7 +44,7 @@ export class TypeGenerator {
   }
 
   #generateCreateEntityTypes() {
-    return Object.entries(this.schema.tables)
+    return Object.entries(this.schema.getTables())
       .map(([name, table]) => {
         const typeName = this.getCreateEntityName(name)
         const omittable = this.#findOmittable<Field<ColumnDefinition>>(table.columns)

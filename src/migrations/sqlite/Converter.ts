@@ -1,7 +1,8 @@
 import { AST, Create, Parser } from 'node-sql-parser/build/sqlite'
-import { DatabaseSchema, ForeignKeyAction, ForeignKeyDefinition, IndexDefinition, TableDefinition } from '../types'
+import { ForeignKeyAction, ForeignKeyDefinition, IndexDefinition, TableDefinition } from '../types'
 import { BaseSQLite } from '../BaseSQLite'
 import { Column } from '../common/Column'
+import { DatabaseSchema } from '../common/DatabaseSchema'
 
 type TableIndexInfo = {
   seqno: number
@@ -35,7 +36,7 @@ export class Converter extends BaseSQLite {
 
   async toSchema(): Promise<DatabaseSchema> {
     const tableAsts = await this.#getTables()
-    const schema: DatabaseSchema = { tables: {} }
+    const schema: DatabaseSchema = new DatabaseSchema({})
 
     if (!tableAsts.length) {
       return schema
@@ -49,11 +50,10 @@ export class Converter extends BaseSQLite {
 
     for (const { table, create_definitions } of creationAST) {
       const tableName = table![0].table
-      schema.tables[tableName] = this.#convertTableInfoToTableDefinition(
-        create_definitions,
-        tableIndexes[tableName],
-        foreignKeys[tableName]
-      )!
+      schema.addTable(
+        tableName,
+        this.#convertTableInfoToTableDefinition(create_definitions, tableIndexes[tableName], foreignKeys[tableName])!
+      )
     }
 
     return schema

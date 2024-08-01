@@ -5,29 +5,29 @@ export class MigrationBuilder {
     const upMigrations: string[] = []
     const downMigrations: string[] = []
 
-    const currentTables = Object.keys(current.tables)
-    const targetTables = Object.keys(target.tables)
+    const currentTableNames = current.getMappedTableNames()
+    const targetTableNames = target.getMappedTableNames()
 
     // Tables to create
-    for (const table of targetTables) {
-      if (!currentTables.includes(table)) {
-        upMigrations.push(this.createTable(table, target.tables[table]))
+    for (const table of targetTableNames) {
+      if (!currentTableNames.includes(table)) {
+        upMigrations.push(this.createTable(table, target.getTable(table)!))
         downMigrations.push(this.dropTable(table))
       }
     }
 
     // Tables to drop
-    for (const table of currentTables) {
-      if (!targetTables.includes(table)) {
-        downMigrations.push(this.createTable(table, current.tables[table]))
+    for (const table of currentTableNames) {
+      if (!targetTableNames.includes(table)) {
+        downMigrations.push(this.createTable(table, current.getTable(table)!))
         upMigrations.push(this.dropTable(table))
       }
     }
 
     // Handle indexes
-    for (const table of targetTables) {
-      const currentIndexes = current.tables[table]?.indexes || []
-      const targetIndexes = target.tables[table].indexes || []
+    for (const table of targetTableNames) {
+      const currentIndexes = current.getTable(table)?.indexes || []
+      const targetIndexes = target.getTable(table)!.indexes || []
 
       // Indexes to create
       for (const index of targetIndexes) {
@@ -63,7 +63,7 @@ export class MigrationBuilder {
 
     const fields = [...columns, ...foreignKeys].join(', ')
 
-    return `CREATE TABLE IF NOT EXISTS ${schema.map ?? name} (${fields});`
+    return `CREATE TABLE IF NOT EXISTS ${name} (${fields});`
   }
 
   private static dropTable(name: string): string {

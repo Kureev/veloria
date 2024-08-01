@@ -22,21 +22,21 @@ export class SchemaDiff {
   }
 
   private getAddedTables(schema: DatabaseSchema): TableDefinition[] {
-    return Object.entries(schema.tables)
-      .filter(([name]) => !this.schema.tables[name])
+    return Object.entries(schema.getTables())
+      .filter(([name]) => !this.schema.getTable(name))
       .map(([, table]) => table)
   }
 
   private getRemovedTables(schema: DatabaseSchema): TableDefinition[] {
-    return Object.entries(this.schema.tables)
-      .filter(([name]) => !schema.tables[name])
+    return Object.entries(this.schema.getTables())
+      .filter(([name]) => !schema.getTable(name))
       .map(([, table]) => table)
   }
 
   private getChangedTables(schema: DatabaseSchema): TableDefinition[] {
-    return Object.entries(schema.tables)
+    return Object.entries(schema.getTables())
       .filter(([name, table]) => {
-        const currentTable = this.schema.tables[name]
+        const currentTable = this.schema.getTable(name)
         return currentTable && JSON.stringify(currentTable) !== JSON.stringify(table)
       })
       .map(([, table]) => table)

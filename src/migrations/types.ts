@@ -1,5 +1,10 @@
 export interface DatabaseSchema {
-  tables: { [tableName: string]: TableDefinition }
+  addTable(name: string, table: TableDefinition): void
+  getTable(name: string): TableDefinition | undefined
+  getTables(): Record<string, TableDefinition>
+  getMappedTables(): Record<string, TableDefinition>
+  getTableNames(): string[]
+  getMappedTableNames(): string[]
 }
 
 export interface Field<T> {
@@ -10,7 +15,7 @@ export interface Field<T> {
 }
 
 export interface TableDefinition {
-  columns: { [columnName: string]: Field<ColumnDefinition> }
+  columns: Record<string, Field<ColumnDefinition>>
   primaryKeys: string[]
   foreignKeys?: ForeignKeyDefinition[]
   indexes?: IndexDefinition[]

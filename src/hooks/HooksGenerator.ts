@@ -1,9 +1,9 @@
 import fs from 'fs'
 import path from 'path'
-import { DatabaseSchema } from '../migrations/types'
 import { TypeGenerator } from '../types/TypeGenerator'
 import { findProjectRoot } from '../utils'
 import { HookObject } from './HookObject'
+import { DatabaseSchema } from '../migrations/common/DatabaseSchema'
 
 const root = findProjectRoot(__dirname)
 
@@ -11,12 +11,7 @@ const root = findProjectRoot(__dirname)
  * Class to generate React hooks for the schema
  */
 export class HooksGenerator {
-  private schema: DatabaseSchema
-
-  constructor(schema: DatabaseSchema) {
-    const filtered = Object.entries(schema.tables).filter(([, table]) => !table.ignore)
-    this.schema = { tables: Object.fromEntries(filtered) }
-  }
+  constructor(private schema: DatabaseSchema) {}
 
   getHookName(name: string) {
     return `use${name}`
@@ -24,7 +19,7 @@ export class HooksGenerator {
 
   generate() {
     const typeGenerator = new TypeGenerator(this.schema)
-    const hooks = Object.entries(this.schema.tables).map(([name]) => {
+    const hooks = Object.entries(this.schema.getTables()).map(([name]) => {
       const entityName = typeGenerator.getEntityName(name)
       const content = fs.readFileSync(path.resolve(root, 'templates', 'hook.ts')).toString('utf8')
       return new HookObject(this.getHookName(name), content.replace(/\$MODEL_NAME/g, entityName))

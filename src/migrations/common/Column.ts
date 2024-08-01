@@ -18,7 +18,7 @@ export class Column implements Field<ColumnDefinition> {
   }
 
   toSQL() {
-    let sql = `${this.#name} ${this.#convertTypeToSQL(this.#options.type)}`
+    let sql = `${this.#options.map || this.#name} ${this.#convertTypeToSQL(this.#options.type)}`
     if (this.#options.notNull) {
       sql += ' NOT NULL'
     }
