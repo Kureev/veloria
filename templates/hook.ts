@@ -1,6 +1,6 @@
 // @ts-ignore This file is used to generate hooks for the schema
 
-import { type Create$MODEL_NAMEInput } from '@veloria/client'
+import { type Create$MODEL_NAMEInput, type $MODEL_NAME } from '@veloria/client'
 import { useSQLiteContext } from 'expo-sqlite'
 
 export function use$MODEL_NAME() {
@@ -15,11 +15,11 @@ export function use$MODEL_NAME() {
   }
 
   async function get(id: number) {
-    return db.getFirstAsync(`SELECT * FROM $MODEL_NAME WHERE id = ${id}`)
+    return db.getFirstAsync<$MODEL_NAME>(`SELECT * FROM $MODEL_NAME WHERE id = ${id}`)
   }
 
   async function list() {
-    return db.getAllAsync(`SELECT * FROM $MODEL_NAME`)
+    return db.getAllAsync<$MODEL_NAME>(`SELECT * FROM $MODEL_NAME`)
   }
 
   async function update(id: number, data: Create$MODEL_NAMEInput) {

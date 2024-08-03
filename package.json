@@ -1,8 +1,8 @@
 {
   "name": "@veloria/cli",
-  "main": "bin/index.js",
+  "main": "bin/cli.js",
   "bin": {
-    "veloria": "bin/index.js"
+    "veloria": "bin/cli.js"
   },
   "dependencies": {
     "@loancrate/prisma-schema-parser": "^2.0.0",
