@@ -21,7 +21,9 @@ export class DatabaseSchema implements DatabaseSchemaInterface {
   getMappedTables() {
     return Object.entries(this.tables).reduce(
       (acc, [name, table]) => {
-        acc[table.map || name] = table
+        if (table.map) {
+          acc[table.map] = table
+        }
         return acc
       },
       {} as Record<string, TableDefinition>

@@ -24,6 +24,16 @@ export class MigrationBuilder {
       }
     }
 
+    // When both tables exist, diff them
+    for (const table of targetTableNames) {
+      if (currentTableNames.includes(table)) {
+        const currentTable = current.getTable(table)!
+        const targetTable = target.getTable(table)!
+
+        this.diffTables(currentTable, targetTable, upMigrations, downMigrations)
+      }
+    }
+
     // Handle indexes
     for (const table of targetTableNames) {
       const currentIndexes = current.getTable(table)?.indexes || []
@@ -77,6 +87,64 @@ export class MigrationBuilder {
 
   private static dropIndex(indexName: string): string {
     return `DROP INDEX IF EXISTS ${indexName};`
+  }
+
+  /**
+   * Diff two tables and generate migrations
+   * SQLite3 does not support ALTER TABLE for modifying structure,
+   * so we need to create a new table and copy the data
+   * @param current Current table
+   * @param target Target table
+   * @param upMigrations Array to store up migrations
+   * @param downMigrations Array to store down migrations
+   */
+  private static diffTables(
+    current: TableDefinition,
+    target: TableDefinition,
+    upMigrations: string[],
+    downMigrations: string[]
+  ) {
+    const currentColumns = Object.keys(current.columns)
+    const targetColumns = Object.keys(target.columns)
+
+    const name = target.map || target.name
+
+    const renameAndRecreateTable = (tableName: string, target: TableDefinition, migrations: string[]) => {
+      migrations.push('BEGIN TRANSACTION;')
+      migrations.push(`ALTER TABLE ${tableName} RENAME TO ${tableName}_old;`)
+      migrations.push(this.createTable(tableName, target))
+      migrations.push(`DROP TABLE ${tableName}_old;`)
+      migrations.push('COMMIT;')
+    }
+
+    // Helper function to check if there are both added and removed columns
+    const hasChangedColumns = (current: TableDefinition['columns'], target: TableDefinition['columns']) => {
+      const currentCols = Object.keys(current)
+      const targetCols = Object.keys(target)
+
+      const added = targetCols.some((col) => !currentCols.includes(col))
+      const removed = currentCols.some((col) => !targetCols.includes(col))
+      return added || removed
+    }
+
+    // If there are both added and removed columns, rebuild the table
+    if (hasChangedColumns(current.columns, target.columns)) {
+      renameAndRecreateTable(name, target, upMigrations)
+      renameAndRecreateTable(name, current, downMigrations)
+    } else {
+      // Columns to modify
+      for (const column of targetColumns) {
+        if (currentColumns.includes(column)) {
+          const currentColumn = current.columns[column]
+          const targetColumn = target.columns[column]
+
+          if (currentColumn.toSQL() !== targetColumn.toSQL()) {
+            renameAndRecreateTable(name, target, upMigrations)
+            renameAndRecreateTable(name, current, downMigrations)
+          }
+        }
+      }
+    }
   }
 
   private static mapReferentialAction(action: string): string | undefined {

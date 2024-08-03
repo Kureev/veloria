@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS reports (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, notes TEXT NOT NULL DEFAULT 'No notes', isPublished INTEGER NOT NULL DEFAULT 1, companyId INTEGER, title TEXT NOT NULL, createdAt NUMERIC NOT NULL DEFAULT (strftime('%s', 'now')), authorId INTEGER, FOREIGN KEY (authorId, companyId) REFERENCES `User`(id, companyId) ON UPDATE CASCADE ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS users (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, companyId INTEGER, email TEXT NOT NULL UNIQUE, first_name TEXT, last_name TEXT DEFAULT 'Doe', createdAt NUMERIC NOT NULL DEFAULT (strftime('%s', 'now')));
+CREATE UNIQUE INDEX IF NOT EXISTS published_notes_unique ON `users`(id, companyId);

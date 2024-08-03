@@ -15,6 +15,7 @@ export interface Field<T> {
 }
 
 export interface TableDefinition {
+  name: string
   columns: Record<string, Field<ColumnDefinition>>
   primaryKeys: string[]
   foreignKeys?: ForeignKeyDefinition[]

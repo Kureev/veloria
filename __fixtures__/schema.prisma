@@ -8,9 +8,12 @@ model Report {
   notes       String   @default("No notes")
   isPublished Boolean  @default(true)
   companyId   Int?
+  title       String
   createdAt   DateTime @default(now())
   authorId    Int?
   author      User?    @relation(fields: [authorId, companyId], references: [id, companyId], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("reports")
 }
 
 model User {
@@ -18,11 +21,12 @@ model User {
   companyId Int?
   email     String   @unique
   firstName String?
-  lastName  String?  @default("Doe") @map("last_name")
+  lastName  String?  @default("Doe")
   createdAt DateTime @default(now())
   reports   Report[]
 
   @@unique([id, companyId], name: "published_notes_unique")
+  @@map("users")
 }
 
 model Test {

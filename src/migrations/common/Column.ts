@@ -99,6 +99,9 @@ export class Column implements Field<ColumnDefinition> {
   #tryPrimitiveValue(value: unknown): string | undefined {
     switch (typeof value) {
       case 'string':
+        if (value === 'AUTOINCREMENT') {
+          return value
+        }
         return `DEFAULT '${value}'`
       case 'number':
         return `DEFAULT ${value}`
@@ -123,6 +126,7 @@ export class Column implements Field<ColumnDefinition> {
       case 'autoincrement()':
         return 'AUTOINCREMENT'
       case 'now()':
+      case "strftime('%s', 'now')":
         return `DEFAULT (strftime('%s', 'now'))`
       case 'cuid()':
         return `DEFAULT #CUID`

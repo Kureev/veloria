@@ -52,7 +52,12 @@ export class Converter extends BaseSQLite {
       const tableName = table![0].table
       schema.addTable(
         tableName,
-        this.#convertTableInfoToTableDefinition(create_definitions, tableIndexes[tableName], foreignKeys[tableName])!
+        this.#convertTableInfoToTableDefinition(
+          create_definitions,
+          tableName,
+          tableIndexes[tableName],
+          foreignKeys[tableName]
+        )!
       )
     }
 
@@ -153,11 +158,12 @@ export class Converter extends BaseSQLite {
 
   #convertTableInfoToTableDefinition(
     definitions: Create['create_definitions'],
+    tableName: string,
     indexes: IndexDefinition[],
     foreignKeys: ForeignKeyDefinition[]
   ): TableDefinition | undefined {
     if (!definitions) {
-      return { columns: {}, indexes: [], primaryKeys: [], foreignKeys: [] }
+      return { name: tableName, columns: {}, indexes: [], primaryKeys: [], foreignKeys: [] }
     }
 
     const columns = definitions.filter((def) => def.resource === 'column')
@@ -186,6 +192,7 @@ export class Converter extends BaseSQLite {
       primaryKeys,
       foreignKeys,
       ignore: false,
+      name: tableName,
       map: undefined,
     }
   }
@@ -202,16 +209,16 @@ export class Converter extends BaseSQLite {
     switch ((value as any).value.type) {
       case 'single_quote_string':
       case 'number':
-        return `DEFAULT '${(value as any).value.value}'`
+        return (value as any).value.value
       case 'function':
         const $value = (value as any).value.name.name[0].value
         const $type = (value as any).value.name.name[0].type
         if ($type === 'origin') {
-          return `DEFAULT ${(value as any).value.name.name[0].value}`
+          return (value as any).value.name.name[0].value
         }
-        return `DEFAULT (${$value}${this.#formatArgs((value as any).value.args)})`
+        return `${$value}${this.#formatArgs((value as any).value.args)}`
       default:
-        console.log((value as any).value.value)
+        console.log('Unknown default value: ', (value as any).value.value)
     }
   }
 
