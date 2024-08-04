@@ -1,6 +1,7 @@
 {
   "name": "veloria",
   "main": "bin/cli.js",
+  "version": "0.1.0",
   "bin": {
     "veloria": "bin/cli.js"
   },
