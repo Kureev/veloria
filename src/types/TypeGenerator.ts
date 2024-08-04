@@ -24,6 +24,11 @@ export class TypeGenerator {
     return capitalize(name)
   }
 
+  getMappedEntityName(name: string) {
+    const table = this.schema.getTables()[name]
+    return table.map ?? name
+  }
+
   generate() {
     const tables = Object.entries(this.schema.getTables())
       .map(([name, table]) => {
@@ -56,6 +61,6 @@ export class TypeGenerator {
   #findOmittable<T extends Field<ColumnDefinition>>(columns: Record<string, T>) {
     return Object.entries(columns)
       .filter(([, column]) => column.isOmittable())
-      .map(([name, column]) => `'${column.get('map') ?? name}'`)
+      .map(([name]) => `'${name}'`)
   }
 }

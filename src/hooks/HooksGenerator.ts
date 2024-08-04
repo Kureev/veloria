@@ -17,12 +17,29 @@ export class HooksGenerator {
     return `use${name}`
   }
 
+  getFieldMapping(name: string) {
+    const table = this.schema.getTables()[name]
+    return (
+      '{\n' +
+      Object.entries(table.columns)
+        .map(([key, value]) => `  ${key}: '${value.get('map') ?? key}'`)
+        .join(',\n') +
+      '\n}'
+    )
+  }
+
   generate() {
     const typeGenerator = new TypeGenerator(this.schema)
     const hooks = Object.entries(this.schema.getTables()).map(([name]) => {
       const entityName = typeGenerator.getEntityName(name)
       const content = fs.readFileSync(path.resolve(root, 'templates', 'hook.ts')).toString('utf8')
-      return new HookObject(this.getHookName(name), content.replace(/\$MODEL_NAME/g, entityName))
+      return new HookObject(
+        this.getHookName(name),
+        content
+          .replace(/\$MODEL_NAME/g, entityName)
+          .replace(/\$MAPPED_MODEL_NAME/g, typeGenerator.getMappedEntityName(name))
+          .replace(/\$FIELD_MAPPING/g, this.getFieldMapping(name))
+      )
     })
 
     return hooks

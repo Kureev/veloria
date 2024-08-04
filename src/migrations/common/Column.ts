@@ -36,10 +36,9 @@ export class Column implements Field<ColumnDefinition> {
   }
 
   toInterface() {
-    const name = this.#options.map ?? this.#name
     const optional = !this.#options.notNull ? '?' : ''
     const type = this.#convertTypeToInterface(this.#options.type)
-    return `${name}${optional}: ${type}`
+    return `${this.#name}${optional}: ${type}`
   }
 
   /**
