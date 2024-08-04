@@ -3,5 +3,8 @@ combined.log
 error.log
 .DS_Store
 .parcel-cache
+.vscode
 bin
 example
+migrations
+__fixtures__

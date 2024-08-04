@@ -17,7 +17,7 @@ const OUTPUT_FOLDER = path.resolve(ROOT, 'node_modules', '@veloria', 'client')
 program.version('0.1.0').name('veloria')
 
 program
-  .command('migrate <schema>')
+  .command('migrate [schema]')
   .usage('assets/schema.prisma')
   .description('Create a new migration')
   .action(async (schemaPath) => {
@@ -39,7 +39,7 @@ program
   })
 
 program
-  .command('generate <schema>')
+  .command('generate [schema]')
   .description('Generate @veloria/client')
   .action((schemaPath) => {
     const file = schemaPath ? path.resolve(process.cwd(), schemaPath) : DEFAULT_SCHEMA_PATH
@@ -64,15 +64,5 @@ program
 
     EntryPointGenerator.generate(datasource, hooks)
   })
-
-program
-  .command('migrate:up')
-  .description('Migrate the database to match the schema')
-  .action(() => {
-    console.log('Migrating up...')
-    program.command('migrate:up').description('Migrate the database to match the schema')
-  })
-
-program.command('migrate:down').description('Revert the last migration')
 
 program.parse(process.argv)

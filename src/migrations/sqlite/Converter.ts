@@ -3,6 +3,7 @@ import { ForeignKeyAction, ForeignKeyDefinition, IndexDefinition, TableDefinitio
 import { BaseSQLite } from '../BaseSQLite'
 import { Column } from '../common/Column'
 import { DatabaseSchema } from '../common/DatabaseSchema'
+import { logger } from '../../logger'
 
 type TableIndexInfo = {
   seqno: number
@@ -218,7 +219,7 @@ export class Converter extends BaseSQLite {
         }
         return `${$value}${this.#formatArgs((value as any).value.args)}`
       default:
-        console.log('Unknown default value: ', (value as any).value.value)
+        logger.error('Unknown default value: ', (value as any).value.value)
     }
   }
 

@@ -1,16 +1,14 @@
 {
-  "name": "@veloria/cli",
+  "name": "veloria",
   "main": "bin/cli.js",
   "bin": {
     "veloria": "bin/cli.js"
   },
   "dependencies": {
     "@loancrate/prisma-schema-parser": "^2.0.0",
-    "@types/node": "^20.14.10",
     "commander": "^12.1.0",
     "expo-sqlite": "^14.0.5",
     "node-sql-parser": "^5.2.0",
-    "pluralize": "^8.0.0",
     "sqlite3": "^5.1.7",
     "winston": "^3.13.1"
   },
@@ -23,7 +21,7 @@
     "react-native": "^0.74.3"
   },
   "devDependencies": {
-    "@types/pluralize": "^0.0.33",
+    "@types/node": "^22.1.0",
     "@types/react": "^18.3.3",
     "prettier-plugin-prisma": "^5.0.0",
     "typescript": "^5.5.4"
